@@ -448,7 +448,7 @@ let VOICE=null;
 function pickVoice(){if(!('speechSynthesis' in window))return;const v=speechSynthesis.getVoices();if(!v.length)return;
  VOICE=v.find(x=>/en[-_]US/i.test(x.lang)&&/male|david|fred|alex|daniel|guy|mark/i.test(x.name))||v.find(x=>/^en/i.test(x.lang))||v[0];}
 if('speechSynthesis' in window){pickVoice();speechSynthesis.onvoiceschanged=pickVoice;}
-const spoken=t=>t.replace(/f\*+k/gi,'freak').replace(/sh\*t/gi,'shoot').replace(/\*/g,'');
+const spoken=t=>t.replace(/f\*\*\*/gi,'mess').replace(/f\*+k/gi,'freak').replace(/sh\*t/gi,'shoot').replace(/\*/g,'');
 function say(text,opts={}){
  const evil=opts.evil!=null?opts.evil:isEvil();const ms=Math.min(9000,700+text.length*62);
  HEADS.forEach(h=>h.talkFor(ms));
