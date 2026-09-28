@@ -407,11 +407,13 @@ let tOff=0;const now=()=>new Date(Date.now()+tOff);
 const pad=n=>String(n).padStart(2,'0');
 const DAYS=['SUN','MON','TUE','WED','THU','FRI','SAT'],MONTHS=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 function fmtTime(d,withSec){let h=d.getHours();const ap=h<12?'AM':'PM';if(!ST.h24){h=h%12||12;}return (ST.h24?pad(h):h)+':'+pad(d.getMinutes())+(withSec?':'+pad(d.getSeconds()):'')+(ST.h24?'':' '+ap);}
-function buzz(p){if(ST.haptics&&navigator.vibrate){try{navigator.vibrate(p);}catch(e){}}}
+let GEST=false;['pointerdown','keydown','touchstart'].forEach(ev=>addEventListener(ev,()=>{GEST=true;},{capture:true,passive:true}));
+const gestured=()=>GEST||(navigator.userActivation&&navigator.userActivation.hasBeenActive);
+function buzz(p){if(ST.haptics&&navigator.vibrate&&gestured()){try{navigator.vibrate(p);}catch(e){}}}
 
 /* ---------- audio (all synthesized) ---------- */
 let AC=null,master=null,noiseBuf=null;
-function audio(){if(!ST.sound)return null;if(!AC){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;AC=new C();master=AC.createGain();master.gain.value=ST.vol;master.connect(AC.destination);
+function audio(){if(!ST.sound||!gestured())return null;if(!AC){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;AC=new C();master=AC.createGain();master.gain.value=ST.vol;master.connect(AC.destination);
   noiseBuf=AC.createBuffer(1,AC.sampleRate*2,AC.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;}
  if(AC.state==='suspended')AC.resume();return AC;}
 function tone(f,dur,{type='sine',vol=.2,when=0,slide=0,attack=.005}={}){const a=audio();if(!a)return;const t=a.currentTime+when,o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(20,slide),t+dur);
