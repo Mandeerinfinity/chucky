@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#070608">
+<meta name="description" content="Hide from Chucky. A dark-house flashlight game. Original art and synthesized audio.">
+<meta name="hfc-build" content="hfc-build-20261001-scarred">
+<title>Hide from Chucky</title>
+<style>
+  :root {
+    --bg: #070608;
+    --ink: #f3ece4;
+    --dim: #b7aa9e;
+    --accent: #d4543c;
+    --line: rgba(212,84,60,.45);
+    --card: rgba(8,6,10,.88);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    position: fixed; inset: 0; overflow: hidden; touch-action: none;
+    user-select: none; -webkit-user-select: none;
+  }
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column; }
+  #view { flex: 1; width: 100%; min-height: 0; display: block; background: #000; touch-action: none; }
+  #hud {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 2;
+    padding: calc(8px + env(safe-area-inset-top)) 12px 28px;
+    background: linear-gradient(#000c, #0000);
+    pointer-events: none;
+    display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  #hud[hidden], #controls[hidden], #prompt[hidden], #caption:empty { display: none !important; }
+  #roomName { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+  #clock { font-family: Impact, "Arial Narrow", sans-serif; font-size: 28px; letter-spacing: .06em; text-align: right; }
+  #clock.dawn { color: #f0c27a; }
+  .meters { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .piprow { display: flex; gap: 4px; align-items: center; font-size: 12px; letter-spacing: .06em; color: var(--dim); }
+  .pip { display:inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1px solid #e7c27a; background: transparent; }
+  .pip.on { background: radial-gradient(circle at 35% 35%, #ffe7a4, #c4552a 70%); }
+  .bar { position: relative; height: 8px; width: min(28vw, 140px); background: #241c20; border-radius: 99px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); }
+  .bar > i { display: block; height: 100%; width: 0%; background: #d7c49a; }
+  #batBar > i { background: linear-gradient(90deg, #c4552a, #e6c36a); }
+  #stamBar > i { background: linear-gradient(90deg, #2a6f4f, #9ddec0); }
+  #stamBar.low > i { background: #c43838; }
+  #heart {
+    display: inline-block; transform-origin: center; color: #c43838;
+    font-size: 16px; line-height: 1; width: 18px; text-align: center;
+  }
+  #bpm { font-size: 12px; color: #e7b4b0; min-width: 52px; }
+  #mapBtn, button {
+    pointer-events: auto; font-family: inherit; color: var(--ink); cursor: pointer;
+  }
+  #mapBtn {
+    position: absolute; right: 10px; top: calc(46px + env(safe-area-inset-top));
+    background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.16);
+    border-radius: 999px; padding: 6px 12px; letter-spacing: .12em; font-size: 12px;
+  }
+  #prompt {
+    position: absolute; left: 50%; bottom: calc(168px + env(safe-area-inset-bottom));
+    transform: translateX(-50%); z-index: 2;
+    background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.12);
+    padding: 6px 12px; border-radius: 999px; font-size: 13px; letter-spacing: .04em;
+    white-space: nowrap;
+  }
+  #caption {
+    position: absolute; left: 12px; right: 12px;
+    bottom: calc(162px + env(safe-area-inset-bottom));
+    z-index: 2; text-align: center; font-size: 15px; line-height: 1.35;
+    color: #f7efe6; text-shadow: 0 2px 8px #000;
+    pointer-events: none;
+  }
+  #controls {
+    display: grid; grid-template-columns: 132px 1fr; gap: 8px;
+    padding: 8px 10px calc(10px + env(safe-area-inset-bottom));
+    background: #0c0a0d; z-index: 3;
+  }
+  #stick {
+    width: 124px; height: 124px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, #1a1418, #100c0e 70%);
+    border: 1px solid rgba(255,255,255,.14);
+    position: relative; touch-action: none; margin: auto;
+  }
+  #knob {
+    position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px;
+    border-radius: 50%; background: rgba(243,236,228,.16); border: 1px solid rgba(243,236,228,.3);
+  }
+  #btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  #btns button {
+    min-height: 56px; border-radius: 12px; border: 1px solid rgba(255,255,255,.12);
+    background: #1a1418; font-weight: 700; letter-spacing: .06em; font-size: 12px;
+    position: relative;
+  }
+  #btns button.on { background: #3a2428; border-color: var(--accent); color: #ffd9cf; }
+  #btns button .n {
+    position: absolute; top: 4px; right: 6px; font-size: 11px; color: #e6c36a;
+  }
+  .keys { grid-column: 1 / -1; color: var(--dim); font-size: 11px; letter-spacing: .03em; }
+  .overlay {
+    position: absolute; z-index: 5; display: none;
+  }
+  .overlay.show { display: block; }
+  .card {
+    left: 50%; top: 50%; transform: translate(-50%, -52%);
+    width: min(440px, calc(100% - 20px));
+    max-height: calc(100% - 20px); overflow: auto;
+    background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+    padding: 14px 14px 12px; box-shadow: 0 24px 80px rgba(0,0,0,.55);
+  }
+  h1 {
+    font-family: Impact, "Arial Narrow", sans-serif; font-weight: 400;
+    letter-spacing: .12em; text-align: center; margin: 0;
+    font-size: 42px; line-height: .9;
+  }
+  h1 span { display: block; font-size: 15px; letter-spacing: .42em; color: var(--dim); margin-bottom: 4px; }
+  h1 em { font-style: normal; color: #e7c27a; }
+  .tag { text-align: center; color: var(--dim); margin: 6px 0 8px; font-size: 13px; }
+  #portrait, #caughtPic, #winPic, #scarePic {
+    display: block; margin: 0 auto 8px; border-radius: 12px;
+    background: #10080a; height: min(300px, 34vh); width: auto;
+  }
+  .row { display: flex; gap: 8px; margin-top: 8px; }
+  .row > * { flex: 1; }
+  button.primary, button.ghost, .choice {
+    min-height: 48px; border-radius: 12px; border: 1px solid rgba(255,255,255,.14);
+    background: #1a1418; font-weight: 700; letter-spacing: .08em;
+  }
+  button.primary { background: linear-gradient(#c44832, #8d2c22); border-color: #e7a090; font-size: 16px; }
+  button.ghost { background: transparent; color: var(--dim); }
+  .choice.sel { border-color: #e6c36a; color: #ffe7b0; background: #2a2018; }
+  .scores { text-align: center; color: var(--dim); font-size: 12px; margin: 8px 0 0; line-height: 1.45; }
+  .fine { text-align: center; color: #7d736c; font-size: 11px; margin: 8px 0 0; }
+  .panel h2 { margin: 0 0 8px; font-family: Impact, "Arial Narrow", sans-serif; letter-spacing: .08em; font-weight: 400; }
+  .panel p, .panel li { color: var(--dim); font-size: 14px; line-height: 1.45; }
+  .panel ul { padding-left: 18px; margin: 6px 0; }
+  label.sl { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin: 8px 0; color: var(--dim); font-size: 14px; }
+  input[type=range] { width: 140px; touch-action: auto; pointer-events: auto; }
+  label.ck { display: flex; gap: 8px; align-items: center; margin: 8px 0; color: var(--ink); font-size: 14px; }
+  #caught, #win, #scareLayer {
+    inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column;
+    padding: 16px;
+  }
+  #caught.show, #win.show { display: flex; }
+  #caught { background: rgba(40,0,0,.78); animation: redflash .45s ease-out; }
+  #win { background: rgba(12,10,6,.82); }
+  @keyframes redflash { 0% { background: #ff1a1a; } 35% { background: rgba(120,0,0,.9); } 100% { background: rgba(40,0,0,.78); } }
+  #caughtLine, #winLine { max-width: 460px; text-align: center; font-size: 18px; margin: 6px 0 10px; }
+  #winTitle { font-family: Impact, "Arial Narrow", sans-serif; letter-spacing: .14em; font-size: 40px; margin: 0; color: #f0c27a; }
+  #scareLayer { display: none; z-index: 6; background: rgba(0,0,0,.2); pointer-events: none; }
+  #scareLayer.show { display: flex; animation: scare .42s ease-out; }
+  #scarePic { height: min(78vh, 640px); filter: contrast(1.05); }
+  @keyframes scare { 0% { transform: scale(1.08); } 100% { transform: scale(1); } }
+  #toast {
+    position: absolute; top: calc(12px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+    z-index: 7; background: #1a120c; border: 1px solid #e6c36a; color: #ffe7b0;
+    padding: 8px 12px; border-radius: 999px; font-size: 13px; letter-spacing: .04em;
+    display: none; max-width: calc(100% - 24px); text-align: center;
+  }
+  #toast.show { display: block; }
+  #mapov {
+    inset: 0; background: rgba(5,4,6,.92); padding: calc(12px + env(safe-area-inset-top)) 12px 12px;
+    overflow: auto;
+  }
+  #mapov.show { display: block; }
+  .maphead { display: flex; justify-content: space-between; align-items: center; }
+  #mapTabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+  #mapTabs button { padding: 8px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.16); background: #161216; }
+  #mapTabs button.sel { border-color: #e6c36a; color: #ffe7b0; }
+  #mapc { width: min(100%, 560px); height: auto; background: #000; border-radius: 8px; image-rendering: pixelated; }
+  #achList { list-style: none; padding: 0; margin: 0; max-height: 46vh; overflow: auto; }
+  #achList li { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+  #achList li b { color: var(--ink); }
+  #achList li.lock { opacity: .45; }
+  @media (min-width: 900px) {
+    #controls { grid-template-columns: 150px 420px; justify-content: center; }
+    #portrait { height: min(340px, 38vh); }
+  }
+  @media (max-height: 700px) {
+    #portrait { height: 26vh; }
+    h1 { font-size: 34px; }
+    #btns button { min-height: 46px; }
+    #stick { width: 108px; height: 108px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="view"></canvas>
+  <div id="hud" hidden>
+    <div id="roomName">House</div>
+    <div id="clock">2:30</div>
+    <div class="meters">
+      <div class="piprow">CHARMS <span id="charms"></span></div>
+      <div class="piprow" id="eyes">EYES 0/5</div>
+      <div class="bar" id="batBar" title="Flashlight battery"><i></i></div>
+      <div class="bar" id="stamBar" title="Stamina"><i></i></div>
+      <span id="heart">♥</span><span id="bpm">52</span>
+    </div>
+    <button id="mapBtn" type="button">MAP</button>
+  </div>
+  <div id="prompt" hidden></div>
+  <div id="caption"></div>
+  <div id="controls" hidden>
+    <div id="stick" aria-label="Move"><div id="knob"></div></div>
+    <div id="btns">
+      <button type="button" id="btnRun">RUN</button>
+      <button type="button" id="btnUse">USE</button>
+      <button type="button" id="btnBreath">BREATH</button>
+      <button type="button" id="btnNoise">NOISE <span class="n" id="nNoise">0</span></button>
+      <button type="button" id="btnLock">LOCK <span class="n" id="nLock">0</span></button>
+      <button type="button" id="btnLight">LIGHT</button>
+    </div>
+    <div class="keys">WASD move · mouse aims · Shift run · E use · Space breath · Q noise · R lock · F light · M map</div>
+  </div>
+
+  <div id="menu" class="overlay card show">
+    <canvas id="portrait" width="520" height="680"></canvas>
+    <h1><span>HIDE FROM</span>CHU<em>CKY</em></h1>
+    <p class="tag">You call him Charles. He calls you Nicky.</p>
+    <button class="primary" id="playBtn" type="button" style="width:100%">PLAY</button>
+    <div class="row">
+      <button class="ghost" id="howBtn" type="button">HOW TO PLAY</button>
+      <button class="ghost" id="setBtn" type="button">SETTINGS</button>
+    </div>
+    <div class="row">
+      <button class="ghost" id="achBtn" type="button">ACHIEVEMENTS</button>
+    </div>
+    <p class="scores" id="scoreLine">No score yet.</p>
+    <p class="scores" id="escapeLine"></p>
+    <p class="fine">Original drawing and synthesized audio. No movie photos or soundtracks.<br>hfc-build-20261001-scarred</p>
+  </div>
+
+  <div id="howto" class="overlay card panel">
+    <h2>HOW TO PLAY</h2>
+    <ul>
+      <li>Dark house. Your flashlight is a cone. Aim with the mouse, or drag the right side of the screen.</li>
+      <li>Move with WASD, arrows, or the stick. Sprint makes noise. Charles hears it and comes looking.</li>
+      <li>Hide in closets and under beds. Hold BREATH while he checks or he finds you.</li>
+      <li>USE opens doors, grabs items, takes stairs, and leaves through the front door.</li>
+      <li>Slam is USE on a nearby open door... the LOCK button seals one. NOISE tosses a beeper that lures him.</li>
+      <li>Batteries feed the light. Five doll eyes are optional collectibles. Three voodoo charms open the exit.</li>
+      <li>Win by lasting until dawn, or by carrying 3 charms out the front door. Easy, Normal, or Hard. Two houses.</li>
+      <li>Jump scares are off until you turn them on. The catch screen still shows him either way.</li>
+    </ul>
+    <p>Charles talks crude and loyal, the way he talks to a friend. He is hunting you tonight anyway.</p>
+    <button class="ghost" type="button" data-back>BACK</button>
+  </div>
+
+  <div id="settings" class="overlay card panel">
+    <h2>SETTINGS</h2>
+    <label class="sl">SFX <input id="vol" type="range" min="0" max="100" value="70"></label>
+    <label class="sl">Voice <input id="voiceVol" type="range" min="0" max="100" value="80"></label>
+    <label class="ck"><input id="voiceOn" type="checkbox" checked> Voice lines (speech)</label>
+    <label class="ck"><input id="capOn" type="checkbox" checked> Captions</label>
+    <label class="ck"><input id="scareOn" type="checkbox"> Jump scare (off). A sudden close-up if he gets in your face.</label>
+    <button class="ghost" id="resetBtn" type="button">RESET LOCAL SCORES</button>
+    <div class="row"><button class="ghost" type="button" data-back>BACK</button></div>
+  </div>
+
+  <div id="achs" class="overlay card panel">
+    <h2>ACHIEVEMENTS</h2>
+    <ul id="achList"></ul>
+    <button class="ghost" type="button" data-back>BACK</button>
+  </div>
+
+  <div id="pick" class="overlay card panel">
+    <h2>TONIGHT</h2>
+    <p>Pick a house and how mean the night is.</p>
+    <button class="choice sel" id="houseRidge" type="button">RIDGE HOUSE<br><small>Ground, upstairs, attic, basement</small></button>
+    <button class="choice" id="houseCabin" type="button">LAKESIDE CABIN<br><small>Main floor and cellar. Tighter.</small></button>
+    <div class="row">
+      <button class="choice" id="diffEasy" type="button">EASY</button>
+      <button class="choice sel" id="diffNormal" type="button">NORMAL</button>
+      <button class="choice" id="diffHard" type="button">HARD</button>
+    </div>
+    <p class="tag" id="diffBlurb">The real night.</p>
+    <button class="primary" id="startBtn" type="button" style="width:100%">START</button>
+    <button class="ghost" type="button" data-back style="width:100%;margin-top:8px">BACK</button>
+  </div>
+
+  <div id="pause" class="overlay card panel">
+    <h2>PAUSED</h2>
+    <button class="primary" id="resumeBtn" type="button" style="width:100%">RESUME</button>
+    <div class="row">
+      <button class="ghost" id="pauseSet" type="button">SETTINGS</button>
+      <button class="ghost" id="quitBtn" type="button">QUIT</button>
+    </div>
+  </div>
+
+  <div id="caught" class="overlay">
+    <canvas id="caughtPic" width="520" height="680"></canvas>
+    <div id="caughtLine"></div>
+    <div class="row" style="width:min(420px,100%)">
+      <button class="primary" id="againBtn" type="button">RUN IT BACK</button>
+      <button class="ghost" id="caughtMenu" type="button">MENU</button>
+    </div>
+  </div>
+
+  <div id="win" class="overlay">
+    <canvas id="winPic" width="520" height="680"></canvas>
+    <h2 id="winTitle">DAWN</h2>
+    <div id="winLine"></div>
+    <p class="scores" id="winStats"></p>
+    <div class="row" style="width:min(420px,100%)">
+      <button class="primary" id="winAgain" type="button">AGAIN</button>
+      <button class="ghost" id="winMenu" type="button">MENU</button>
+    </div>
+  </div>
+
+  <div id="mapov" class="overlay">
+    <div class="maphead">
+      <h2 style="margin:0">HOUSE MAP</h2>
+      <button class="ghost" id="mapClose" type="button">CLOSE</button>
+    </div>
+    <div id="mapTabs"></div>
+    <canvas id="mapc" width="240" height="160"></canvas>
+    <p class="tag">Lit rooms stay on the map. Charles only marks if he is close, same floor.</p>
+  </div>
+
+  <div id="scareLayer"><canvas id="scarePic" width="520" height="680"></canvas></div>
+  <div id="toast"></div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
